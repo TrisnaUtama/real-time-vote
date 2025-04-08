@@ -10,7 +10,7 @@ SECRET_KEY = "django-insecure-f57hjzrfn-+afilhi4ar5iw7k3zvf=n+yq_#81c)e6hjcxhva(
 DEBUG = True
 ALLOWED_HOSTS = ["*"]
 CSRF_TRUSTED_ORIGINS = [
-    "https://web.real-time-vote.orb.local",
+    "https://www.trisnautama.site",
 ]
 
 # Application definition

@@ -78,7 +78,7 @@
     console.log(`🔌 Setting up WebSocket for poll ID: ${finalPollId}`);
   
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProtocol}//localhost:8000/ws/polls/${finalPollId}/`;
+    const wsUrl = `${wsProtocol}//www.trisnautama.site/ws/polls/${finalPollId}/`;
     console.log(`🔌 WebSocket URL: ${wsUrl}`);
     
     const socket = new WebSocket(wsUrl);
