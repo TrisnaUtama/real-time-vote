@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+{% block title %}Vote Detail{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-purple-50 to-purple-100 py-10">
+  <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 bg-white rounded-2xl shadow-md p-8">
+
+    <div class="mb-4">
+      <a href="{% url 'dashboard' %}" class="inline-flex items-center text-[#2973B2] hover:underline">
+        ⬅️ Back to Polls
+      </a>
+    </div>
+
+    <h1 class="text-3xl font-bold text-[#2973B2] mb-2 text-center">{{ poll.question }}</h1>
+    <p class="text-sm text-gray-500 text-center mb-2">🗓️ Created at: {{ poll.created_at|date:"F d, Y" }}</p>
+    <p class="text-sm text-gray-600 text-center mb-4" id="total-votes">
+      ✅ Total Votes: <span class="font-medium">{{ total_votes }}</span>
+    </p>
+
+    {% if has_voted %}
+      <div class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4 text-center">
+        ⚠️ You have already voted in this poll.
+      </div>
+    {% endif %}
+
+    <form method="post" class="space-y-4">
+      {% csrf_token %}
+      {% for choice in choices %}
+        <label class="block bg-gray-100 rounded-lg px-4 py-3 cursor-pointer hover:bg-gray-200 transition" id="choice-{{ choice.id }}">
+          <input type="radio" name="choice" value="{{ choice.id }}" class="mr-2" {% if has_voted %}disabled{% endif %} />
+          <span class="choice-text">{{ choice.text }}</span> — 
+          🗳️ <span class="vote-count font-medium">{{ choice.vote_count }}</span> votes
+          <div class="w-full bg-gray-200 rounded h-2 mt-1">
+            <div class="bg-blue-500 h-2 rounded progress-bar" style="width: {{ choice.percentage }}%"></div>
+          </div>
+          <span class="text-xs text-gray-500 percentage-display">{{ choice.percentage }}%</span>
+        </label>
+      {% endfor %}
+
+      <button type="submit"
+        class="w-full mt-4 inline-flex items-center justify-center gap-2 px-4 py-2 bg-[#2973B2] text-white font-medium rounded-lg hover:bg-[#23639B] transition-colors duration-200 {% if has_voted %}opacity-50 cursor-not-allowed{% endif %}"
+        {% if has_voted %}disabled{% endif %}>
+        <i class="fa-solid fa-paper-plane"></i>
+        Submit Vote
+      </button>
+    </form>
+    
+    <div id="live-notifications" class="mt-4 space-y-2"></div>
+  </div>
+</div>
+
+<script>
+  const pathSegments = window.location.pathname.split('/').filter(Boolean);
+  const pollIndex = pathSegments.indexOf('poll');
+  const pollId = pollIndex >= 0 && pathSegments.length > pollIndex + 1 ? pathSegments[pollIndex + 1] : null;
+  
+  let finalPollId = pollId;
+  if (!finalPollId) {
+    const urlMatch = window.location.pathname.match(/\/poll\/([^/]+)/);
+    console.log('🔍 URL match result:', urlMatch);
+    if (urlMatch && urlMatch[1]) {
+      finalPollId = urlMatch[1];
+      console.log('🔍 Extracted poll ID from regex:', finalPollId);
+    }
+  }
+  
+  if (!finalPollId) {
+    const anyIdMatch = window.location.pathname.match(/\/([0-9a-f]{24})\/?/);
+    if (anyIdMatch && anyIdMatch[1]) {
+      finalPollId = anyIdMatch[1];
+      console.log('🔍 Extracted poll ID from general pattern:', finalPollId);
+    }
+  }
+  
+  if (!finalPollId) {
+    console.error('❌ Could not extract poll ID from URL');
+  } else {
+    console.log(`🔌 Setting up WebSocket for poll ID: ${finalPollId}`);
+  
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProtocol}//localhost:8000/ws/polls/${finalPollId}/`;
+    console.log(`🔌 WebSocket URL: ${wsUrl}`);
+    
+    const socket = new WebSocket(wsUrl);
+
+    function createNotification(message, type = 'info') {
+      const colors = {
+        info: 'bg-blue-100 border-blue-400 text-blue-700',
+        success: 'bg-green-100 border-green-400 text-green-700',
+        error: 'bg-red-100 border-red-400 text-red-700'
+      };
+      
+      const notification = document.createElement('div');
+      notification.className = `${colors[type]} border px-4 py-2 rounded relative animate-fade-in`;
+      notification.innerHTML = `
+        <p>${message}</p>
+        <button class="absolute top-1 right-1 text-sm" onclick="this.parentElement.remove()">
+          <i class="fas fa-times"></i>
+        </button>
+      `;
+      
+      setTimeout(() => {
+        notification.classList.add('opacity-0', 'transition-opacity', 'duration-300');
+        setTimeout(() => notification.remove(), 300);
+      }, 5000);
+      
+      return notification;
+    }
+
+    socket.onopen = () => {
+      console.log(`✅ Connected to poll ${finalPollId} updates`);
+    };
+
+    socket.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+      console.log('📡 Received detail update:', data);
+
+      if (data.update_type === 'detail') {
+        const totalVotesEl = document.querySelector('#total-votes span');
+        if (totalVotesEl) {
+          console.log(`✏️ Updating total votes to ${data.total_votes}`);
+          totalVotesEl.textContent = data.total_votes;
+          totalVotesEl.classList.add('animate-bounce', 'text-green-600');
+          setTimeout(() => {
+            totalVotesEl.classList.remove('animate-bounce', 'text-green-600');
+          }, 1000);
+        } else {
+          console.warn('⚠️ Could not find total votes element');
+        }
+
+        data.choices.forEach(choice => {
+          const choiceEl = document.getElementById(`choice-${choice.id}`);
+          if (choiceEl) {
+            console.log(`✏️ Updating choice ${choice.id} to ${choice.vote_count} votes (${choice.percentage}%)`);
+            
+            const voteCountEl = choiceEl.querySelector('.vote-count');
+            if (voteCountEl) {
+              voteCountEl.textContent = choice.vote_count;
+              voteCountEl.classList.add('text-blue-600', 'scale-110');
+              setTimeout(() => {
+                voteCountEl.classList.remove('text-blue-600', 'scale-110');
+              }, 500);
+            }
+
+            const progressBar = choiceEl.querySelector('.progress-bar');
+            const percentageDisplay = choiceEl.querySelector('.percentage-display');
+            if (progressBar && percentageDisplay) {
+              progressBar.style.width = `${choice.percentage}%`;
+              percentageDisplay.textContent = `${choice.percentage}%`;
+              progressBar.classList.add('transition-all', 'duration-500');
+            }
+          } else {
+            console.warn(`⚠️ Could not find element for choice ${choice.id}`);
+          }
+        });
+
+        const notifications = document.getElementById('live-notifications');
+        if (notifications) {
+          notifications.prepend(createNotification(
+            `🗳️ ${data.message} (Total votes: ${data.total_votes})`,
+            'info'
+          ));
+        }
+      }
+    };
+
+    socket.onclose = (e) => {
+      console.log('❌ Disconnected from poll updates', e);
+    };
+
+    socket.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+  }
+</script>
+{% endblock %}

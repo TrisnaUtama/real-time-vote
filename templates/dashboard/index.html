@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 py-10">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <h1 class="text-4xl font-extrabold mb-10 text-[#2973B2] text-center drop-shadow">
+      🗳️ Explore & Vote on Polls
+    </h1>
+
+    {% if polls %}
+      <div class="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+        {% for poll in polls %}
+          <div class="bg-white rounded-2xl shadow-md hover:shadow-xl transform hover:scale-105 transition duration-300 p-6 flex flex-col justify-between">
+            <div>
+              <h2 class="text-2xl font-semibold text-gray-800 mb-2">
+                {{ poll.question }}
+              </h2>
+              <p class="text-sm text-gray-500 mb-4">
+                🗓️ {{ poll.created_at|date:"F d, Y" }}<br>
+                ✅ Total Votes: <span id="vote-count-{{ poll.id }}" class="font-medium">{{ poll.total_votes }}</span>
+              </p>
+            </div>
+
+            <div class="mt-auto">
+              <a href="{% url 'vote_detail' poll.id %}"
+                class="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-[#2973B2] text-white font-medium rounded-lg hover:bg-[#23639B] transition-colors duration-200">
+                <i class="fa-solid fa-check-to-slot"></i>
+                Vote Now
+              </a>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="text-center text-gray-600 text-lg mt-12">
+        🙁 No polls available at the moment.
+      </p>
+    {% endif %}
+  </div>
+</div>
+
+<div id="global-notification" class="fixed bottom-4 right-4 hidden">
+  <div class="bg-blue-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center">
+    <span id="notification-message"></span>
+    <button onclick="hideNotification()" class="ml-4">
+      <i class="fas fa-times"></i>
+    </button>
+  </div>
+</div>
+
+<script>
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const ws = new WebSocket(`${wsProtocol}//localhost:8000/ws/polls/`);
+
+  function showNotification(message) {
+    const notification = document.getElementById('global-notification');
+    const messageEl = document.getElementById('notification-message');
+    messageEl.innerHTML = message;
+    notification.classList.remove('hidden');
+    notification.classList.add('animate-fade-in-up');
+    
+    setTimeout(hideNotification, 5000);
+  }
+
+  function hideNotification() {
+    const notification = document.getElementById('global-notification');
+    notification.classList.add('animate-fade-out');
+    setTimeout(() => {
+      notification.classList.add('hidden');
+      notification.classList.remove('animate-fade-out', 'animate-fade-in-up');
+    }, 300);
+  }
+
+  ws.onopen = () => {
+    console.log('✅ Connected to global polls feed');
+  };
+
+  ws.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    console.log('📊 Received update:', data);
+
+    if (data.update_type === 'index') {
+      const voteElement = document.getElementById(`vote-count-${data.poll_id}`);
+      if (voteElement) {
+        console.log(`✏️ Updating vote count for poll ${data.poll_id} to ${data.total_votes}`);
+        voteElement.textContent = data.total_votes;
+        voteElement.classList.add('animate-pulse', 'text-green-600');
+        setTimeout(() => {
+          voteElement.classList.remove('animate-pulse', 'text-green-600');
+        }, 1000);
+      } else {
+        console.warn(`⚠️ Could not find element with ID: vote-count-${data.poll_id}`);
+      }
+
+      showNotification(`🗳️ New vote in "${data.question}" (Total: ${data.total_votes})`);
+    }
+  };
+
+  ws.onclose = (e) => {
+    console.log('❌ Disconnected from polls feed', e);
+    showNotification('⚠️ Disconnected from live updates. Refresh to reconnect.');
+  };
+
+  ws.onerror = (error) => {
+    console.error('WebSocket error:', error);
+    showNotification('⚠️ Connection error. Try refreshing.');
+  };
+</script>
+{% endblock %}
