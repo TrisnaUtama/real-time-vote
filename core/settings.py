@@ -1,27 +1,19 @@
-
 from pathlib import Path
 from dotenv import load_dotenv
 import os
 
 load_dotenv(override=True)
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
-
-# SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = "django-insecure-f57hjzrfn-+afilhi4ar5iw7k3zvf=n+yq_#81c)e6hjcxhva("
-
-# SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
-
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = ["*"]
+CSRF_TRUSTED_ORIGINS = [
+    "https://web.real-time-vote.orb.local",
+]
 
 # Application definition
-
 INSTALLED_APPS = [
     "daphne",
     "django.contrib.admin",
@@ -72,33 +64,29 @@ TEMPLATES = [
 WSGI_APPLICATION = "core.wsgi.application"
 ASGI_APPLICATION = 'core.asgi.application'
 
+# Channels config
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],
+            "hosts": [("redis_server", 6379)],
         },
     },
 }
 
 # Database
-# https://docs.djangoproject.com/en/5.1/ref/settings/#databases
-
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": os.environ.get("PG_DATABASE", "real-time-vote"),
-        "USER": os.environ.get("PG_USER", "real-time-vote"), 
-        "PASSWORD": os.environ.get("PG_PASSWORD", "real-time-vote"), 
-        "HOST": os.environ.get("PG_HOST", "localhost"), 
-        "PORT": os.environ.get("PG_PORT", "5432"), 
+        "USER": os.environ.get("PG_USER", "real-time-vote"),
+        "PASSWORD": os.environ.get("PG_PASSWORD", "real-time-vote"),
+        "HOST": os.environ.get("PG_HOST", "db"),
+        "PORT": os.environ.get("PG_PORT", "5432"),
     }
 }
 
-
 # Password validation
-# https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
@@ -114,32 +102,31 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+# Static files
 STORAGES = {
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
 
-
-# Internationalization
-# https://docs.djangoproject.com/en/5.1/topics/i18n/
-
-LANGUAGE_CODE = "en-us"
-
-TIME_ZONE = "UTC"
-
-USE_I18N = True
-
-USE_TZ = True
-
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.1/howto/static-files/
-
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "static"
 
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
+# Internationalization
+LANGUAGE_CODE = "en-us"
+TIME_ZONE = "UTC"
+USE_I18N = True
+USE_TZ = True
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# HUEY Configuration
+HUEY = {
+    'name': 'real-time-vote',
+    'connection': {
+        'host': os.getenv("REDIS_HOST", "redis_server"),
+        'port': 6379,
+    },
+    'immediate': False,
+    'utc': True,
+}

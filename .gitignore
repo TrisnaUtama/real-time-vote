@@ -15,7 +15,7 @@ yarn.lock
 *.swp
 *.swo
 
-.env
+# .env
 .env.local
 .env*.local
 

@@ -19,7 +19,6 @@ def submit_vote_task(user_id, poll_id, choice_id):
         poll = Poll.objects.get(id=poll_id)
         choice = Choice.objects.get(id=choice_id, poll=poll)
 
-        # Check if user already voted
         if Vote.objects.filter(user=user, poll=poll).exists():
             print(f"⚠️ User {user_id} already voted in poll {poll_id}")
             return {
@@ -28,14 +27,11 @@ def submit_vote_task(user_id, poll_id, choice_id):
                 'poll_id': str(poll_id)
             }
 
-        # Create the vote
         vote = Vote.objects.create(user=user, poll=poll, choice=choice)
         print(f"✅ Vote created with ID: {vote.id}")
 
-        # Calculate updated stats for the poll
         total_votes = Vote.objects.filter(poll=poll).count()
         
-        # Get choice data
         choices_data = []
         for c in poll.choices.all():
             vote_count = Vote.objects.filter(choice=c).count()
@@ -47,7 +43,6 @@ def submit_vote_task(user_id, poll_id, choice_id):
                 'percentage': round(percentage, 2)
             })
 
-        # Prepare update data
         update_data = {
             'poll_id': str(poll_id),
             'question': poll.question,
@@ -56,10 +51,8 @@ def submit_vote_task(user_id, poll_id, choice_id):
             'message': f"New vote in '{poll.question[:20]}...'",
         }
         
-        # Get channel layer
         channel_layer = get_channel_layer()
         
-        # Send detail update to specific poll group
         detail_message = {
             'type': 'poll_update',
             'data': {
@@ -70,7 +63,6 @@ def submit_vote_task(user_id, poll_id, choice_id):
         print(f"📤 Sending detail update to poll_{poll_id} group: {json.dumps(detail_message)[:100]}...")
         async_to_sync(channel_layer.group_send)(f"poll_{poll_id}", detail_message)
 
-        # Send index update to all polls group
         index_message = {
             'type': 'poll_update',
             'data': {
