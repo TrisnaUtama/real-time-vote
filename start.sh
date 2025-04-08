@@ -1,27 +1,23 @@
-#!/bin/sh
 
-set -e  # Exit on error
 
-# Set default values if not provided
+set -e
+
 DB_HOST=${DB_HOST:-db}
 DB_PORT=${DB_PORT:-5432}
 
 echo "⏳ Waiting for PostgreSQL at $DB_HOST:$DB_PORT..."
 
-# Wait for the DB to be ready
 while ! nc -z $DB_HOST $DB_PORT; do
   sleep 1
 done
 
 echo "✅ PostgreSQL is available"
 
-# Apply migrations and collect static files
 echo "🚀 Running Django setup tasks..."
 python manage.py makemigrations
 python manage.py migrate
 python manage.py collectstatic --noinput
 
-# Create superuser if not exists
 echo "👤 Creating superuser..."
 python manage.py shell <<EOF
 from django.contrib.auth import get_user_model
@@ -37,6 +33,5 @@ else:
     print("ℹ️ Superuser already exists.")
 EOF
 
-# Start Daphne server
 echo "🌀 Starting Daphne server..."
 daphne -b 0.0.0.0 -p 8000 core.asgi:application
